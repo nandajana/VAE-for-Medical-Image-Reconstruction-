@@ -2,6 +2,8 @@
 
 MedMNIST datasets based Variational Autoencoder (VAE) and Conditional Variational Autoencoder (CVAE) framework for medical image synthesis. This work concentrates on enhancing reconstruction quality, latent space organization and training stability by architectural tuning and loss scaling optimization.
 
+
+
 📌 Project Overview
 This project explores deep generative modeling for medical imaging using VAE and CVAE architectures. The objective is to generate high-quality synthetic medical images while maintaining meaningful latent representations.
 
@@ -26,6 +28,10 @@ Proper KL divergence regularization
 Dataset-specific model selection (VAE vs CVAE)
 
 Latent space visualization and interpretability
+
+
+
+
 
 🏗️ Model Architecture
 Variational Autoencoder (VAE)
@@ -64,6 +70,11 @@ Unified training loop across all datasets
 
 This resolved earlier instability issues and prevented KL collapse, leading to smoother convergence and better generalization.
 
+
+
+
+
+
 📊 Results & Performance
 Stable convergence within ~20 epochs
 
@@ -88,6 +99,10 @@ Standardized training for reproducibility
 
 Built a modular and extensible generative pipeline
 
+
+
+
+
 🚀 Future Extensions
 Improve reconstruction sharpness with perceptual losses
 
@@ -96,6 +111,10 @@ Explore advanced conditional mechanisms
 Enhance latent space continuity
 
 Apply diffusion-based generative comparisons
+
+
+
+
 
 💡 Final Outcome
 This project demonstrates a strong understanding of:
