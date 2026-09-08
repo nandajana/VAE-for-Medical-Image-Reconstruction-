@@ -1,133 +1,196 @@
-# VAE-for-Medical-Image-Reconstruction-
 
-MedMNIST datasets based Variational Autoencoder (VAE) and Conditional Variational Autoencoder (CVAE) framework for medical image synthesis. This work concentrates on enhancing reconstruction quality, latent space organization and training stability by architectural tuning and loss scaling optimization.
+# VAE / CVAE for Medical Image Reconstruction
 
+A PyTorch implementation of a **Variational Autoencoder (VAE)** and **Conditional Variational Autoencoder (CVAE)** for reconstructing and generating medical images from the [MedMNIST v2](https://medmnist.com/) collection. The project targets stable training, a well-behaved latent space, and class-conditioned generation across multiple imaging modalities.
 
-<img width="4731" height="2036" alt="image" src="https://github.com/user-attachments/assets/1f96d6d5-395a-4a65-8155-8746b4289229" />
+<img width="4731" height="2036" alt="Reconstruction and generation results" src="https://github.com/user-attachments/assets/1f96d6d5-395a-4a65-8155-8746b4289229" />
 
-📌 Project Overview
-This project explores deep generative modeling for medical imaging using VAE and CVAE architectures. The objective is to generate high-quality synthetic medical images while maintaining meaningful latent representations.
+---
 
-We experimented with multiple medical datasets including:
+## 📌 Overview
 
-TissueMNIST
+The notebook trains one unconditional VAE and four class-conditional CVAEs, one per modality:
 
-BreastMNIST (MRI)
+| Model | Dataset (MedMNIST) | Modality |
+|---|---|---|
+| VAE | TissueMNIST | Tissue microscopy |
+| CVAE | BreastMNIST | Breast ultrasound |
+| CVAE | ChestMNIST | Chest X-ray |
+| CVAE | PathMNIST | Colorectal histopathology |
+| CVAE | DermaMNIST | Dermatoscopy |
 
-ChestMNIST (X-ray)
+All images are resized to 28×28 and normalized to 3 channels. Grayscale sources (breast, chest) are converted to grayscale then replicated across 3 channels so a single architecture handles every dataset.
 
-PathMNIST (Pathology)
+**Focus areas:**
+- Stable training dynamics (no KL collapse)
+- Proper KL-divergence weighting (β-VAE style)
+- Dataset-specific model choice (plain VAE vs. class-conditional CVAE)
+- Latent space inspection via t-SNE
 
-DermaMNIST (Dermatology)
+---
 
-The project emphasizes:
+## 🏗️ Architecture
 
-Stable training dynamics
+Both models share a convolutional encoder/decoder backbone:
 
-Proper KL divergence regularization
+**Encoder:** 3 conv blocks (32 → 64 → 128 channels, stride-2/2/1) with BatchNorm + LeakyReLU, flattened and projected to `mu` and `logvar` (latent dim = 128).
 
-Dataset-specific model selection (VAE vs CVAE)
+**Decoder:** linear projection back to a 128×7×7 feature map, followed by 2 transposed-conv upsampling blocks (128 → 64 → 32) and a final conv + Tanh to 3 channels.
 
-Latent space visualization and interpretability
+**CVAE** extends the VAE by embedding the class label (embedding dim = 16) and concatenating it with the image (at the encoder input) and with the latent vector `z` (at the decoder input), enabling class-conditioned reconstruction and sampling.
 
+Loss: mean-reduced MSE reconstruction term, scaled by batch size, plus a β-weighted KL-divergence term:
 
+loss = MSE(recon, x) * batch_size + β * KL(mu, logvar)
 
 
+**Training hyperparameters** (from `config` in the notebook):
 
-🏗️ Model Architecture
-Variational Autoencoder (VAE)
-Used for unconditional datasets to capture general structural patterns.
+| Parameter | Value |
+|---|---|
+| Batch size | 128 |
+| Latent dim (`z_dim`) | 128 |
+| Learning rate | 3e-4 (Adam, cosine annealing) |
+| Epochs | 20 |
+| β (KL weight) | 0.5 |
+| Gradient clipping | max norm 1.0 |
 
-Conditional Variational Autoencoder (CVAE)
-Used for labeled datasets to enable class-conditioned generation.
+---
 
-Architectural Enhancements
-Deeper encoder–decoder networks
+## 📂 Repository contents
 
-Batch Normalization for stability
+.
+├── Copy_of_alter_DGM_trial (1).ipynb # main notebook: data loading, models, training, evaluation
+├── cvae_breast.pth # trained CVAE weights — BreastMNIST
+├── cvae_chest.pth # trained CVAE weights — ChestMNIST
+├── cvae_derma.pth # trained CVAE weights — DermaMNIST
+├── cvae_path.pth # trained CVAE weights — PathMNIST
+└── README.md
 
-LeakyReLU activations
 
-Expanded latent space (128 dimensions)
+Each `.pth` checkpoint (~11 MB) is a dict with `model_state_dict`, `model_type`, and `dataset` keys.
 
-Structured and modular training pipeline
+---
 
-These refinements significantly improved representation capacity and feature sensitivity.
+## ⚙️ Installation & Dependencies
 
-⚙️ Training & Optimization Improvements
-The final model includes several key optimizations:
+Requires **Python 3.9+**.
 
-Properly scaled MSE reconstruction loss
+```bash
+git clone https://github.com/nandajana/VAE-for-Medical-Image-Reconstruction-.git
+cd VAE-for-Medical-Image-Reconstruction-
+pip install -r requirements.txt
+```
 
-Balanced KL divergence regularization (β-VAE style weighting)
+If you don't have a `requirements.txt` yet, create one with:
 
-Cosine annealing learning rate scheduler
+torch
+torchvision
+medmnist
+scikit-learn
+numpy
+matplotlib
+tqdm
 
-Gradient clipping for stable updates
 
-Deterministic training with fixed random seeds
+MedMNIST datasets are downloaded automatically on first run via the `medmnist` package (no manual download needed).
 
-Unified training loop across all datasets
+---
 
-This resolved earlier instability issues and prevented KL collapse, leading to smoother convergence and better generalization.
+## 🖥️ Infrastructure
 
+- **Developed/trained on:** Google Colab (the notebook auto-detects a Colab runtime and adjusts file-saving/download behavior accordingly; it also runs fine in a local Jupyter environment).
+- **Hardware:** GPU recommended (CUDA-enabled), but the code falls back to CPU automatically via `torch.device('cuda' if torch.cuda.is_available() else 'cpu')`.
+- **Training cost:** ~20 epochs per model; a single epoch over any one MedMNIST split completes in a few minutes on a T4-class GPU.
+- **Storage:** each checkpoint is ~11 MB; generated sample images and models are written to `saved_models/` and `generated_images/` (or `models/`, `images/` in the `__main__` block) and can optionally be zipped and downloaded automatically when running in Colab.
 
+---
 
+## 🚀 Usage
 
+Open and run the notebook top to bottom:
 
+```bash
+jupyter notebook "Copy_of_alter_DGM_trial (1).ipynb"
+```
 
-📊 Results & Performance
-Stable convergence within ~20 epochs
+The `__main__` cell will, in order:
+1. Train a standard VAE on **TissueMNIST**.
+2. Train a CVAE on each of **BreastMNIST, ChestMNIST, PathMNIST, DermaMNIST**.
+3. Save model weights and generated/reconstructed sample images.
+4. Plot training/validation loss curves and t-SNE latent-space visualizations.
 
-Strong reconstruction quality across datasets
+To reuse a pretrained checkpoint instead of retraining:
 
-Improved class separation in CVAE latent spaces
+```python
+import torch
+from model import CVAE  # or wherever CVAE is defined
 
-Reduced training variance across experiments
+state = torch.load('cvae_chest.pth', map_location='cpu')
+model = CVAE(num_classes=<n_classes_for_dataset>, z_dim=128)
+model.load_state_dict(state['model_state_dict'])
+model.eval()
+```
 
-Better structured latent distributions
+---
 
-Latent spaces were visualized using t-SNE, confirming meaningful clustering and coverage for most datasets.
+## 📊 Results
 
- Key Contributions
-Designed a robust VAE/CVAE training framework
+- Stable convergence within ~20 epochs across all five datasets.
+- No KL collapse after tuning the β weight and MSE scaling.
+- Class-conditional CVAE samples show visibly better class separation in latent space (verified via t-SNE) than the unconditional VAE.
 
-Fixed improper loss scaling that caused unstable optimization
+---
 
-Improved latent representation quality
+## 🚀 Future Extensions
 
-Standardized training for reproducibility
+- Perceptual/LPIPS-based losses for sharper reconstructions
+- Higher-resolution MedMNIST variants (e.g. 64×64, 224×224 via `medmnist`'s `size` parameter)
+- Alternative conditioning mechanisms (FiLM, cross-attention)
+- Comparison against diffusion-based generative baselines
 
-Built a modular and extensible generative pipeline
+---
 
+## 📖 Citation
 
+This project builds on the **MedMNIST v2** dataset collection. If you use this code or its outputs, please cite the MedMNIST papers:
 
+```bibtex
+@article{medmnistv2,
+    title={MedMNIST v2-A large-scale lightweight benchmark for 2D and 3D biomedical image classification},
+    author={Yang, Jiancheng and Shi, Rui and Wei, Donglai and Liu, Zequan and Zhao, Lin and Ke, Bilian and Pfister, Hanspeter and Ni, Bingbing},
+    journal={Scientific Data},
+    volume={10},
+    number={1},
+    pages={41},
+    year={2023},
+    publisher={Nature Publishing Group UK London}
+}
 
+@inproceedings{medmnistv1,
+    title={MedMNIST Classification Decathlon: A Lightweight AutoML Benchmark for Medical Image Analysis},
+    author={Yang, Jiancheng and Shi, Rui and Ni, Bingbing},
+    booktitle={IEEE 18th International Symposium on Biomedical Imaging (ISBI)},
+    pages={191--195},
+    year={2021}
+}
+```
 
-🚀 Future Extensions
-Improve reconstruction sharpness with perceptual losses
+Note: DermaMNIST is distributed under CC BY-NC 4.0; the other MedMNIST subsets used here are CC BY 4.0. See the [MedMNIST project page](https://medmnist.com/) for the citation of each underlying source dataset (e.g. the original breast ultrasound, chest X-ray, histopathology, and dermatoscopy datasets).
 
-Explore advanced conditional mechanisms
+If you use this repository itself, you can cite it as:
 
-Enhance latent space continuity
+```bibtex
+@misc{nandajana_vae_medical_2024,
+  title  = {VAE / CVAE for Medical Image Reconstruction},
+  author = {nandajana},
+  year   = {2024},
+  url    = {https://github.com/nandajana/VAE-for-Medical-Image-Reconstruction-}
+}
+```
 
-Apply diffusion-based generative comparisons
+---
 
+## License
 
-
-
-
-💡 Final Outcome
-This project demonstrates a strong understanding of:
-
-Variational inference
-
-Generative modeling
-
-Loss balancing in VAEs
-
-Latent space analysis
-
-Experimental reproducibility
-
-The final system provides a stable and extensible foundation for medical image generation research.
+Add a license (e.g. MIT) if you intend others to reuse this code — none is currently specified in the repository.
